@@ -1,0 +1,256 @@
+---
+title: "Bank-R-Out"
+author: "Mathieu Compagnon"
+date: "09/02/2017"
+output: html_document
+---
+
+
+<p><font color = "darkred" size = 4><center><b>BANK - BUILD TYPOLOGIES</b></center></font><p>
+<br>
+<font color = "darkblue" size = 5>Summary</font>
+<p><font color = "darkblue">
+1. Load data 
+2. Summarize the data structure using a numerical table (for numeric variables, use mean / standard deviation and extent, for categorical variables, use effective / proportion).<br>
+3. Recode the age and income variables into three interval classes ({0-34, 35-51, 52-67} and {0-24386, 24387-43758, 43759-63130}, respectively) and ensure that the variables are treated as they are.<br>
+4. Provide a list of 10 rules based on income by considering a minimum support of 0.1 and a value of lij ≥ 1.5.<br>
+5. Use an automatic classification procedure coupled with a principal component analysis (all variables must be recorded in numerical variables) to construct a typology of individuals.
+</font></p>
+<br>
+<p><font color = "darkblue" size = 5>1. Load Data</font></p>
+<p><font color = "darkblue">The first thing we have to do is to load our data placed in bank-data.txt file in our main repository.<br>
+The bank-data.txt file is nothing else that a file we copied and then past from a website having our data.<br>
+But before the begining, let's just install all our needed packages.
+</font></p>
+
+
+```{R}
+#install.packages(c("arules","arulesViz")) let in comment in order to not have to install every time.
+```
+
+
+```{R}
+bank = read.csv("bank-data.txt", encoding="UTF-8", sep = ",")
+print(dim(bank))
+head(bank, n = 5)
+```
+
+<p><font color = "darkblue" size = 5>2. Summarize data structure</font><p>
+<p><font color = "darkblue">
+Before summarize our data structure let's just see all of our main columns and what they contain using the table function.
+</font></p>
+
+
+```{R}
+table(bank$Sex)
+table(bank$Region)
+table(bank$Married)
+table(bank$Car)
+table(bank$Save_acct)
+table(bank$Current_acct)
+table(bank$Mortgage)
+table(bank$Pep)
+```
+
+<p><font color = "darkblue">
+We create a function which calculate proportion in dataframe because we will need to calculate 11 times column proportion.<br>
+Then we will just create our table (which is actually a matrix) showing our main information. 
+</font></p>
+
+
+```{R}
+## Example of setting row and column names
+prop = function(word, data){
+    return(round(length(grep(word, data))/nrow(bank), 2));
+}
+
+data_mean_sd_prop = c(mean(bank$Age), mean(bank$Income), mean(bank$Children), NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, #MEAN
+                 sd(bank$Age), sd(bank$Income), sd(bank$Children), NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, #SD
+                 NA, NA, NA, prop("FEMALE", bank$Sex), prop("INNER_CITY", bank$Region), prop("RURAL", bank$Region),  
+                        prop("SUBURBAN", bank$Region), prop("TOWN", bank$Region), prop("YES", bank$Married), 
+                        prop("YES", bank$Car), prop("YES", bank$Save_acct), prop("YES", bank$Current_acct),
+                        prop("YES", bank$Mortgage), prop("YES", bank$Pep)#Proportion
+                )
+
+mdata_all <- matrix(data_mean_sd_prop, nrow = 3, ncol = 14, byrow = TRUE,
+               dimnames = list(c("Mean", "Standard Deviation", "Proportion"),
+                               c("Age", "Income", "Children", "Female", 
+                                     "Inner City", "Rural", "Suburban", "Town", "Married", 
+                                      "Car", "Save Acct", "Current Acct", "Mortgage", "Pep")))
+
+mdata_all
+```
+
+<p><font color = "darkblue">
+Obvioulsy it is also possible to create two distincts table representing either Mean and Standard Deviation or Proportion according to our columns. 
+</font></p>
+
+
+```{R}
+data_mean_sd = c(mean(bank$Age), mean(bank$Income), mean(bank$Children),
+                 sd(bank$Age), sd(bank$Income), sd(bank$Children))
+
+mdata_mean_sd <- matrix(data_mean_sd, nrow = 2, ncol = 3, byrow = TRUE,
+               dimnames = list(c("Mean", "Standard Deviation"),
+                               c("Age", "Income", "Children")))
+
+mdata_mean_sd
+
+
+data_prop = c(prop("FEMALE", bank$Sex), prop("INNER_CITY", bank$Region), prop("RURAL", bank$Region),  
+                        prop("SUBURBAN", bank$Region), prop("TOWN", bank$Region), prop("YES", bank$Married), 
+                        prop("YES", bank$Car), prop("YES", bank$Save_acct), prop("YES", bank$Current_acct),
+                        prop("YES", bank$Mortgage), prop("YES", bank$Pep)
+                )
+
+mdata_prop <- matrix(data_prop, nrow = 1, ncol = 11, byrow = TRUE,
+               dimnames = list(c("Proportion"),
+                               c("Female","Inner City", "Rural", "Suburban", "Town", "Married", 
+                                "Car", "Save Acct", "Current Acct", "Mortgage", "Pep")))
+
+mdata_prop
+```
+
+<p><font color = "darkblue" size = 5>3. Recode Variables</font><p>
+<p><font color = "darkblue">
+The next step will be to create new columns depending of Age and Income that we will name X_inter. Those columns will contain 3 values in order to group different ages or incomes into 3 categories. <br>
+<u>Age:</u> Young / Senior / Old <br>
+<u>Income:</u> Poor / Median / Rich <br>
+In order to have a better vision of our columns we will simply display minimum mean max ect. of each using summary function.<br>
+Finally we will display our two new columns in order to show what we did.
+</font></p>
+
+
+```{R}
+summary(bank$Age)
+bank$Age_inter = "Young"
+bank$Age_inter[bank$Age > 35 & bank$Age <= 51] = "Senior"
+bank$Age_inter[bank$Age > 52 & bank$Age <= 67] = "Old"
+bank$Age_inter = as.factor(bank$Age_inter)
+```
+
+
+```{R}
+summary(bank$Income)
+bank$Income_inter = "Poor"
+bank$Income_inter[bank$Income > 24387 & bank$Income <= 43758] = "Median"
+bank$Income_inter[bank$Income > 43759 & bank$Income <= 63130] = "Rich"
+bank$Income_inter = as.factor(bank$Income_inter)
+head(bank, n=10)
+```
+
+<p><font color = "darkblue" size = 5>4. Build rules about Incomes</font><p>
+<p><font color = "darkblue">
+The first thing you'll see here is that we called our libraries from the packages we insatalled earlier in the first cell.<br>
+Then we choose the columns we want to use for our work in a vector called "keeps" stand for columns kept.<br>
+Finally we created using those columns a 'transactions' type called myBank which will be essential in the next steps.
+</font></p>
+
+
+```{R}
+library("arules");
+library("arulesViz");
+
+keeps <- c("Sex", "Region", "Married", "Car", "Save_acct","Current_acct","Mortgage","Pep", "Age_inter", "Income_inter")
+subBank <- bank[keeps]
+
+myBank <- as(subBank, "transactions");
+```
+
+<p><font color = "darkblue">
+Now that all our packages are loaded and we have our transaction variable declared, let's create the rule we are looking for. <br>
+To do that we created a rule having as asked a support of 0.1. <br>
+Next we created a sub rules inheriting of the first having as parameters lift >= 1.5 and depending of the column 'Income_inter'. <br>
+To make all of that more meaningful, we ordered it by confidence and decided to show only five rules because there were not 10 with this lift parameter.
+</font></p>
+
+
+```{R}
+## Mine rules.
+rules <- apriori(myBank, parameter = list(support = 0.1))
+
+## Select a subset of rules using partial matching on the items
+## in the right-hand-side and a quality measure with output income_inter and lift >=1.5
+number_rules = 5
+rules.sub <- subset(rules, subset = lift >= 1.5 & rhs %pin% "Income_inter=")[1:number_rules]
+
+## Display rules ordered by confidence
+inspect(head(rules.sub, by = "confidence"))
+```
+
+<p><font color = "darkblue">As you can see, rules show that the most of young people having no action are poor, then young people having mortage are also poor, then that young people living in inner city are poor etc.</font><p>
+<br>
+<p><font color = "darkblue" size = 5>5. Construct a typology of individuals</font><p>
+<p><font color = "darkblue">
+So here we are ! The final step of our work ! <br>
+First thing we decided to do was to use the eclat algorithm rather than the apriori algorithm.
+</font></p>
+
+
+```{R}
+itemFrequencyPlot(myBank, support = 0.1, cex.names=0.8);
+fsets = eclat(myBank, parameter = list(support = 0.1), control = list(verbose=FALSE));
+singleItems = fsets[size(items(fsets)) == 1];
+singleSupport = quality(singleItems)$support;
+names(singleSupport) = unlist(LIST(items(singleItems), decode = FALSE));
+head(singleSupport, n = 5);
+itemsetList = LIST(items(fsets), decode = FALSE);
+allConfidence = quality(fsets)$support / sapply(itemsetList, function(x)
+max(singleSupport[as.character(x)]));
+quality(fsets) = cbind(quality(fsets), allConfidence);
+```
+
+<p><font color = "darkblue">
+Once again, using the eclat function we are able to create typologies. In our example we selected minimum attribut length of 2 in order to really have associations like we did in TD for shopping.<br>
+So we selected the 30 most relevent association according to the support and display it.
+</font></p>
+
+
+```{R}
+#### Associations Rule ####
+
+itemsets <- eclat(myBank, parameter = list(minlen = 2, tidLists = TRUE)) #Dont take maxlen the more item there will be the best its gonna be
+summary(itemsets)
+fsets.top30 <- sort(itemsets)[1:30]
+inspect(fsets.top30)
+```
+
+<p><font color = "darkblue" size = 5>6. Go ahead</font><p>
+<p><font color = "darkblue">
+As the question 5 was free enough we decided to build different kind of graphics using 'arules' and 'arulesViz' functions/tools in order to display different kind of typologies in the last part of our work.<br>
+To improve our visualization we played with some others functions of our libraries !<br><br>
+So let's for example create a cross table !
+</font></p>
+
+
+```{R}
+size_matrice = 3
+lift <- crossTable(myBank, measure="lift", sort=TRUE)
+lift[1:size_matrice,1:size_matrice]
+```
+
+<p><font color = "darkblue">
+...and a cluster dendrogram !
+</font></p>
+
+
+```{R}
+s <- myBank[,itemFrequency(myBank)>0.05]
+    d_jaccard <- dissimilarity(s, which = "items")
+    plot(hclust(d_jaccard, method = "ward.D2"))
+```
+
+<p><font color = "darkblue">
+The following example compares the item frequencies of people with a large income (boxes) with the average in the data set.
+</font></p>
+
+
+```{R}
+myBank.largeIncome <- myBank[myBank %in% "Income_inter=Rich"]
+itemFrequencyPlot(myBank.largeIncome[, 1:10], population = myBank[, 1:10])
+```
+
+<p><font color = "darkblue">
+Thank you for watching, I hope it was interesting and meaningful. <br>
+Have a good day !
+</font></p>
