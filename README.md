@@ -17,7 +17,8 @@ install.packages('devtools') #Answer yes, yes and choose your country
 devtools::install_github('IRkernel/IRkernel')  
 IRkernel::installspec()
 ```
-You can know access to the notebook doing:
+After leaving R (Ctrl+d) you could access to the notebook doing:
 ```
+cd /home/vagrant/ubuntu/Project  
 jupyter notebook --ip=0.0.0.0
 ```
